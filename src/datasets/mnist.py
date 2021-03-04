@@ -40,7 +40,7 @@ class MNIST_Dataset(TorchvisionDataset):
         train_set = MyMNIST(root=self.root, train=True, download=True,
                             transform=transform, target_transform=target_transform)
         # Subset train_set to normal class
-        train_idx_normal = get_target_label_idx(train_set.train_labels.clone().data.cpu().numpy(), self.normal_classes)
+        train_idx_normal = get_target_label_idx(train_set.targets.clone().data.cpu().numpy(), self.normal_classes)
         self.train_set = Subset(train_set, train_idx_normal)
 
         self.test_set = MyMNIST(root=self.root, train=False, download=True,
@@ -60,19 +60,6 @@ class MyMNIST(MNIST):
         Returns:
             triple: (image, target, index) where target is index of the target class.
         """
-        if self.train:
-            img, target = self.train_data[index], self.train_labels[index]
-        else:
-            img, target = self.test_data[index], self.test_labels[index]
-
-        # doing this so that it is consistent with all other datasets
-        # to return a PIL Image
-        img = Image.fromarray(img.numpy(), mode='L')
-
-        if self.transform is not None:
-            img = self.transform(img)
-
-        if self.target_transform is not None:
-            target = self.target_transform(target)
+        img, target = super().__getitem__(index)
 
         return img, target, index  # only line changed
