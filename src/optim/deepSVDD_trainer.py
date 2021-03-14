@@ -84,11 +84,11 @@ class DeepSVDDTrainer(BaseTrainer):
                 outputs, out_p = net(inputs, return_prev=True)
                 grads = torch.autograd.grad(outputs=outputs.sum(), inputs=inputs, retain_graph=True)[0]
                 inputs.requires_grad_(False)
-                if r is None:
-                    r = torch.randn((1,) + grads.shape[1:], device=self.device)
+                #if r is None:
+                #    r = torch.randn((1,) + grads.shape[1:], device=self.device)
 
-                dist = torch.sum(outputs ** 2, dim=1) + torch.sum((grads - r.expand_as(grads))**2, dim=(1, 2, 3))
-                #dist = torch.sum((outputs - self.c) ** 2, dim=1)
+                #dist = torch.sum(outputs ** 2, dim=1) + torch.sum((grads - r.expand_as(grads))**2, dim=(1, 2, 3))
+                dist = torch.sum((outputs - self.c) ** 2, dim=1)
                 if self.objective == 'soft-boundary':
                     scores = dist - self.R ** 2
                     loss = self.R ** 2 + (1 / self.nu) * torch.mean(torch.max(torch.zeros_like(scores), scores))
