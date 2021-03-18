@@ -204,11 +204,11 @@ class DeepSVDDTrainer(BaseTrainer):
             n_samples += outputs.shape[0]
             grads = torch.autograd.grad(outputs=outputs.sum(), inputs=net.conv3.weight, create_graph=True, retain_graph=True)[0]
             inputs.requires_grad_(False)
-            grad_sum = torch.sum(grads, dim=0)
+            #grad_sum = torch.sum(grads, dim=0)
             if c is None:
-                c = torch.zeros_like(grad_sum)
-            c += grad_sum
-
+                c = torch.zeros_like(grads)
+            c += grads
+            print(c.shape)
         c /= n_samples
 
         # If c_i is too close to 0, set to +-eps. Reason: a zero unit can be trivially matched with zero weights.
