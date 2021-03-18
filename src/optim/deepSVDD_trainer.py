@@ -72,7 +72,7 @@ class DeepSVDDTrainer(BaseTrainer):
             loss_epoch = 0.0
             n_batches = 0
             epoch_start_time = time.time()
-
+            self.c_g = self.c_g.detach()
             for data in train_loader:
                 inputs, _, _ = data
                 inputs = inputs.to(self.device)
