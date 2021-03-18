@@ -198,11 +198,13 @@ class DeepSVDDTrainer(BaseTrainer):
             for data in train_loader:
                 # get the inputs of the batch
                 inputs, _, _ = data
+                inputs.requires_grad_(True)
                 inputs = inputs.to(self.device)
                 outputs = net(inputs)
                 n_samples += outputs.shape[0]
                 grads = torch.autograd.grad(outputs=outputs.sum(), inputs=inputs, retain_graph=True)[0]
                 grad_sum = torch.sum(grads, dim=0)
+                inputs.requires_grad_(False)
                 if c is None:
                     c = torch.zeros_like(grad_sum)
                 c += grad_sum
