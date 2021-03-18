@@ -203,8 +203,8 @@ class DeepSVDDTrainer(BaseTrainer):
             outputs = net(inputs)
             n_samples += outputs.shape[0]
             grads = torch.autograd.grad(outputs=outputs.sum(), inputs=inputs, retain_graph=True)[0]
-            grad_sum = torch.sum(grads, dim=0)
             inputs.requires_grad_(False)
+            grad_sum = torch.sum(grads, dim=0)
             if c is None:
                 c = torch.zeros_like(grad_sum)
             c += grad_sum
