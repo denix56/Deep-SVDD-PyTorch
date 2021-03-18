@@ -25,6 +25,7 @@ class DeepSVDDTrainer(BaseTrainer):
         # Deep SVDD parameters
         self.R = torch.tensor(R, device=self.device)  # radius R initialized with 0 by default.
         self.c = torch.tensor(c, device=self.device) if c is not None else None
+        self.c_g = None
         self.nu = nu
 
         # Optimization parameters
@@ -56,6 +57,7 @@ class DeepSVDDTrainer(BaseTrainer):
         if self.c is None:
             logger.info('Initializing center c...')
             self.c = self.init_center_c(train_loader, net)
+            self.c_g = self.init_center_c_grad(train_loader, net)
             logger.info('Center c initialized.')
 
         # Training
@@ -70,7 +72,6 @@ class DeepSVDDTrainer(BaseTrainer):
             loss_epoch = 0.0
             n_batches = 0
             epoch_start_time = time.time()
-            r = None
 
             for data in train_loader:
                 inputs, _, _ = data
@@ -87,8 +88,8 @@ class DeepSVDDTrainer(BaseTrainer):
                 #if r is None:
                 #    r = torch.randn((1,) + grads.shape[1:], device=self.device)
 
-                #dist = torch.sum(outputs ** 2, dim=1) + torch.sum((grads - r.expand_as(grads))**2, dim=(1, 2, 3))
-                dist = torch.sum((outputs - self.c) ** 2, dim=1)
+                dist = torch.sum((outputs - self.c) ** 2, dim=1) + torch.sum((grads - self.c_g.expand_as(grads))**2, dim=(1, 2, 3))
+                #dist = torch.sum((outputs - self.c) ** 2, dim=1)
                 if self.objective == 'soft-boundary':
                     scores = dist - self.R ** 2
                     loss = self.R ** 2 + (1 / self.nu) * torch.mean(torch.max(torch.zeros_like(scores), scores))
@@ -186,6 +187,33 @@ class DeepSVDDTrainer(BaseTrainer):
 
         return c
 
+
+    def init_center_c_grad(self, train_loader: DataLoader, net: BaseNet, eps=0.1):
+        """Initialize hypersphere center c as the mean from an initial forward pass on the data."""
+        n_samples = 0
+        c = None
+
+        net.eval()
+        with torch.no_grad():
+            for data in train_loader:
+                # get the inputs of the batch
+                inputs, _, _ = data
+                inputs = inputs.to(self.device)
+                outputs = net(inputs)
+                n_samples += outputs.shape[0]
+                grads = torch.autograd.grad(outputs=outputs.sum(), inputs=inputs, retain_graph=True)[0]
+                grad_sum = torch.sum(grads, dim=0)
+                if c is None:
+                    c = torch.zeros_like(grad_sum)
+                c += grad_sum
+
+        c /= n_samples
+
+        # If c_i is too close to 0, set to +-eps. Reason: a zero unit can be trivially matched with zero weights.
+        c[(abs(c) < eps) & (c < 0)] = -eps
+        c[(abs(c) < eps) & (c > 0)] = eps
+
+        return c
 
 def get_radius(dist: torch.Tensor, nu: float):
     """Optimally solve for radius R via the (1-nu)-quantile of distances."""
