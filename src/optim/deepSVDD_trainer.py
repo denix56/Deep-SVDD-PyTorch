@@ -83,7 +83,7 @@ class DeepSVDDTrainer(BaseTrainer):
                 # Update network parameters via backpropagation: forward + backward + optimize
                 inputs.requires_grad_(True)
                 outputs, out_p = net(inputs, return_prev=True)
-                grads = torch.autograd.grad(outputs=outputs.sum(), inputs=inputs, retain_graph=True)[0]
+                grads = torch.autograd.grad(outputs=outputs.sum(), inputs=net.conv3.weight, create_graph=True, retain_graph=True)[0]
                 inputs.requires_grad_(False)
                 #if r is None:
                 #    r = torch.randn((1,) + grads.shape[1:], device=self.device)
@@ -202,7 +202,7 @@ class DeepSVDDTrainer(BaseTrainer):
             inputs.requires_grad_(True)
             outputs = net(inputs)
             n_samples += outputs.shape[0]
-            grads = torch.autograd.grad(outputs=outputs.sum(), inputs=inputs, retain_graph=True)[0]
+            grads = torch.autograd.grad(outputs=outputs.sum(), inputs=net.conv3.weight, create_graph=True, retain_graph=True)[0]
             inputs.requires_grad_(False)
             grad_sum = torch.sum(grads, dim=0)
             if c is None:
