@@ -9,6 +9,7 @@ import time
 import torch
 import torch.optim as optim
 import numpy as np
+from sklearn.cluster import DBSCAN
 
 
 class DeepSVDDTrainer(BaseTrainer):
@@ -57,6 +58,7 @@ class DeepSVDDTrainer(BaseTrainer):
         if self.c is None:
             logger.info('Initializing center c...')
             self.c = self.init_center_c(train_loader, net)
+            self.get_clusters(train_loader, net)
             self.c_g = self.init_center_c_grad(train_loader, net)
             logger.info('Center c initialized.')
 
@@ -97,7 +99,7 @@ class DeepSVDDTrainer(BaseTrainer):
                 else:
                     loss = torch.mean(dist)
                     loss1 = torch.mean(dist1)
-                    loss = loss + loss1
+                    #loss = loss + loss1
                 loss.backward()
                 optimizer.step()
 
@@ -188,6 +190,18 @@ class DeepSVDDTrainer(BaseTrainer):
         c[(abs(c) < eps) & (c > 0)] = eps
 
         return c
+
+    def get_clusters(self, train_loader, net):
+        c = self.init_center_c(train_loader, net)
+
+        net.eval()
+        with torch.no_grad():
+            for data in train_loader:
+                # get the inputs of the batch
+                inputs, _, _ = data
+                inputs = inputs.to(self.device)
+                outputs = net(inputs)
+                print(torch.sum((c-outputs)**2, dim=1))
 
 
     def init_center_c_grad(self, train_loader: DataLoader, net: BaseNet, eps=0.1):
