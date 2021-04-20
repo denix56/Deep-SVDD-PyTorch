@@ -242,7 +242,7 @@ class DeepSVDDTrainer(BaseTrainer):
                 outputs = net(inputs)
                 n_samples += outputs.shape[0]
                 print(outputs.shape)
-                c += torch.sum(outputs, dim=0)
+                c += torch.sum(outputs, dim=0).squeeze()
 
         c /= n_samples
 
@@ -299,7 +299,7 @@ class DeepSVDDTrainer(BaseTrainer):
                 outputs = (1 - grads_norm / grad_max) * outputs
             inputs.requires_grad_(False)
             n_samples += outputs.shape[0]
-            c += torch.sum(outputs.detach(), dim=0)
+            c += torch.sum(outputs.detach(), dim=0).squeeze()
 
         c /= n_samples
 
