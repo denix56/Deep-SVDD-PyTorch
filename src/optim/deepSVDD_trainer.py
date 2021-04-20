@@ -56,8 +56,6 @@ class DeepSVDDTrainer(BaseTrainer):
         # Set learning rate scheduler
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=self.lr_milestones, gamma=0.1)
 
-        layer = net.conv2
-
         # Initialize hypersphere center c (if c not loaded)
         if self.c is None:
             logger.info('Initializing center c...')
@@ -69,11 +67,11 @@ class DeepSVDDTrainer(BaseTrainer):
             old_mode = self.mode
             if self.mode == 'weight' or self.mode == 'both':
                 self.mode = 'weight'
-                self.c_g3 = self.init_center_c_grad(train_loader, net, layer.weight).detach()
+                self.c_g3 = self.init_center_c_grad(train_loader, net, None).detach()
                 self.mode = old_mode
             if self.mode == 'input' or self.mode == 'both':
                 self.mode = 'input'
-                self.c_gi = self.init_center_c_grad(train_loader, net, layer.weight).detach()
+                self.c_gi = self.init_center_c_grad(train_loader, net, None).detach()
                 self.mode = old_mode
             # self.c_g2 = self.c_g2.detach()
             # self.c_g3 = self.c_g3.detach()
@@ -108,7 +106,7 @@ class DeepSVDDTrainer(BaseTrainer):
                 # grads2 = torch.autograd.grad(outputs=outputs.sum(), inputs=net.conv2.weight, create_graph=True, retain_graph=True)[0]
                 if self.mode == 'weight' or self.mode == 'both':
                     self.mode = 'weight'
-                    grads3 = torch.autograd.grad(outputs=outputs.sum(), inputs=layer.weight, create_graph=True,
+                    grads3 = torch.autograd.grad(outputs=outputs.sum(), inputs=None, create_graph=True,
                                                  retain_graph=True)[0]
                     dist3 = (grads3 - self.c_g3.expand_as(grads3)) ** 2
                     loss3 = torch.sum(dist3) / outputs.shape[0]
