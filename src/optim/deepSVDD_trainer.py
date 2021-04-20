@@ -100,7 +100,7 @@ class DeepSVDDTrainer(BaseTrainer):
 
                 # Update network parameters via backpropagation: forward + backward + optimize
                 inputs.requires_grad_(True)
-                outputs, out_p = net(inputs, return_prev=True)
+                outputs = net(inputs)
                 loss3 = None
                 old_mode = self.mode
                 # grads2 = torch.autograd.grad(outputs=outputs.sum(), inputs=net.conv2.weight, create_graph=True, retain_graph=True)[0]
