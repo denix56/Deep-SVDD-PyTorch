@@ -112,6 +112,8 @@ def main(dataset_name, net_name, xp_path, data_path, load_config, load_model, lo
                 if mode == 'original':
                     if 'grad_norm' in add_params:
                         continue
+                if mode == 'input' and not add_params:
+                    continue
                 for i in range(repeat_n):
 
                     if first:
