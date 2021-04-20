@@ -120,7 +120,7 @@ class DeepSVDD(object):
         """Save Deep SVDD model to export_model."""
 
         net_dict = self.net.state_dict()
-        ae_net_dict = self.ae_net.state_dict() if save_ae else None
+        ae_net_dict = self.ae_net.state_dict() if save_ae and self.ae_net is not None else None
 
         torch.save({'R': self.R,
                     'c': self.c,
@@ -138,7 +138,8 @@ class DeepSVDD(object):
         if load_ae:
             if self.ae_net is None:
                 self.ae_net = build_autoencoder(self.net_name)
-            self.ae_net.load_state_dict(model_dict['ae_net_dict'])
+            if self.ae_net is not None:
+                self.ae_net.load_state_dict(model_dict['ae_net_dict'])
 
     def save_results(self, export_json):
         """Save results dict to a JSON-file."""
