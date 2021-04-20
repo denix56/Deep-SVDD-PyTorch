@@ -15,7 +15,7 @@ class CIFAR10_ResNet(BaseNet):
 
         self.net = resnet18(pretrained=True)
         self.rep_dim = self.net.fc.in_features
-        self.net = nn.Sequential(*list(self.net.children())[:-1])
+        self.net = nn.Sequential(*list(self.net.children())[:-2])
         #self.net.fc = nn.Linear(self.net.fc.in_features, self.rep_dim, bias=False)
 
 
