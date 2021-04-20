@@ -30,7 +30,7 @@ def build_network(net_name):
 def build_autoencoder(net_name):
     """Builds the corresponding autoencoder network."""
 
-    implemented_networks = ('mnist_LeNet', 'cifar10_LeNet', 'cifar10_LeNet_ELU')
+    implemented_networks = ('mnist_LeNet', 'cifar10_LeNet', 'cifar10_LeNet_ELU', 'cifar10_resnet')
     assert net_name in implemented_networks
 
     ae_net = None
