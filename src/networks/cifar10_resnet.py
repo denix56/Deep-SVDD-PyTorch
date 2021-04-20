@@ -11,10 +11,12 @@ class CIFAR10_ResNet(BaseNet):
     def __init__(self):
         super().__init__()
 
-        self.rep_dim = 128
+
 
         self.net = resnet18(pretrained=True)
-        self.net.fc = nn.Linear(self.net.fc.in_features, self.rep_dim, bias=False)
+        self.rep_dim = self.net.fc.in_features
+        self.net = nn.Sequential(*list(self.net.children())[:-1])
+        #self.net.fc = nn.Linear(self.net.fc.in_features, self.rep_dim, bias=False)
 
 
         # self.pool = nn.MaxPool2d(2, 2)
