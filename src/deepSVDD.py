@@ -59,13 +59,13 @@ class DeepSVDD(object):
 
     def train(self, dataset: BaseADDataset, optimizer_name: str = 'adam', lr: float = 0.001, n_epochs: int = 50,
               lr_milestones: tuple = (), batch_size: int = 128, weight_decay: float = 1e-6, device: str = 'cuda',
-              n_jobs_dataloader: int = 0):
+              n_jobs_dataloader: int = 0, mode: str = 'original', add_params=None):
         """Trains the Deep SVDD model on the training data."""
 
         self.optimizer_name = optimizer_name
         self.trainer = DeepSVDDTrainer(self.objective, self.R, self.c, self.nu, optimizer_name, lr=lr,
                                        n_epochs=n_epochs, lr_milestones=lr_milestones, batch_size=batch_size,
-                                       weight_decay=weight_decay, device=device, n_jobs_dataloader=n_jobs_dataloader)
+                                       weight_decay=weight_decay, device=device, n_jobs_dataloader=n_jobs_dataloader, mode=mode, add_params=add_params)
         # Get the model
         self.net = self.trainer.train(dataset, self.net)
         self.R = float(self.trainer.R.cpu().data.numpy())  # get float
@@ -87,7 +87,7 @@ class DeepSVDD(object):
 
     def pretrain(self, dataset: BaseADDataset, optimizer_name: str = 'adam', lr: float = 0.001, n_epochs: int = 100,
                  lr_milestones: tuple = (), batch_size: int = 128, weight_decay: float = 1e-6, device: str = 'cuda',
-                 n_jobs_dataloader: int = 0, resume_path: str = None):
+                 n_jobs_dataloader: int = 0, resume_path: str = None, save_path : str = 'pretrained_ae.pt'):
         """Pretrains the weights for the Deep SVDD network \phi via autoencoder."""
 
         self.ae_net = build_autoencoder(self.net_name)
@@ -97,7 +97,7 @@ class DeepSVDD(object):
         self.ae_optimizer_name = optimizer_name
         self.ae_trainer = AETrainer(optimizer_name, lr=lr, n_epochs=n_epochs, lr_milestones=lr_milestones,
                                     batch_size=batch_size, weight_decay=weight_decay, device=device,
-                                    n_jobs_dataloader=n_jobs_dataloader, resume_path=resume_path)
+                                    n_jobs_dataloader=n_jobs_dataloader, resume_path=resume_path, save_path=save_path)
         self.ae_net = self.ae_trainer.train(dataset, self.ae_net)
 
         self.ae_trainer.test(dataset, self.ae_net)
