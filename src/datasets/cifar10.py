@@ -41,10 +41,10 @@ class CIFAR10_Dataset(TorchvisionDataset):
                    (-6.132882973622672, 8.046098172351265)]
 
         # CIFAR-10 preprocessing: GCN (with L1 norm) and min-max feature scaling to [0,1]
-        transform = transforms.Compose([transforms.ToTensor(),
-                                        transforms.Lambda(gcn_l1),
-                                        transforms.Normalize([min_max[normal_class][0]] * 3,
-                                                             [min_max[normal_class][1] - min_max[normal_class][0]] * 3),
+        transform = transforms.Compose([transforms.RandomHorizontalFlip(),
+                                        transforms.RandomVerticalFlip(),
+                                        transforms.ToTensor(),
+                                        #transforms.Lambda(gcn_l1),
                                         transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                              std=[0.229, 0.224, 0.225])])
 
