@@ -6,6 +6,17 @@ from .preprocessing import get_target_label_idx, global_contrast_normalization
 
 import torchvision.transforms as transforms
 
+def gcn_l1(x):
+    return global_contrast_normalization(x, scale='l1')
+
+
+class IntOutlier:
+    def __init__(self, outlier_classes):
+        self.outlier_classes = outlier_classes
+
+    def __call__(self, x):
+        return int(x in self.outlier_classes)
+
 
 class CIFAR10_Dataset(TorchvisionDataset):
 
@@ -31,11 +42,11 @@ class CIFAR10_Dataset(TorchvisionDataset):
 
         # CIFAR-10 preprocessing: GCN (with L1 norm) and min-max feature scaling to [0,1]
         transform = transforms.Compose([transforms.ToTensor(),
-                                        transforms.Lambda(lambda x: global_contrast_normalization(x, scale='l1')),
+                                        transforms.Lambda(gcn_l1),
                                         transforms.Normalize([min_max[normal_class][0]] * 3,
                                                              [min_max[normal_class][1] - min_max[normal_class][0]] * 3)])
 
-        target_transform = transforms.Lambda(lambda x: int(x in self.outlier_classes))
+        target_transform = transforms.Lambda(IntOutlier(self.outlier_classes))
 
         train_set = MyCIFAR10(root=self.root, train=True, download=True,
                               transform=transform, target_transform=target_transform)

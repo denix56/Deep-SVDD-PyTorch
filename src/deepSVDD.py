@@ -91,6 +91,9 @@ class DeepSVDD(object):
         """Pretrains the weights for the Deep SVDD network \phi via autoencoder."""
 
         self.ae_net = build_autoencoder(self.net_name)
+        if self.ae_net is None:
+            return
+
         self.ae_optimizer_name = optimizer_name
         self.ae_trainer = AETrainer(optimizer_name, lr=lr, n_epochs=n_epochs, lr_milestones=lr_milestones,
                                     batch_size=batch_size, weight_decay=weight_decay, device=device,

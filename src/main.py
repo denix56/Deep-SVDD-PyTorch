@@ -9,6 +9,8 @@ from utils.visualization.plot_images_grid import plot_images_grid
 from deepSVDD import DeepSVDD
 from datasets.main import load_dataset
 
+import os
+
 
 ################################################################################
 # Settings
@@ -22,8 +24,10 @@ from datasets.main import load_dataset
               help='Config JSON-file path (default: None).')
 @click.option('--load_model', type=click.Path(exists=True), default=None,
               help='Model file path (default: None).')
-@click.option('--load_ae_model', type=click.Path(exists=True), default=None,
+@click.option('--load_ae_model', type=click.Path(exists=False), default=None,
               help='Pretrained model file path (default: None).')
+@click.option('--save_ae_model', type=click.Path(exists=False), default='pretrained_ae.pt',
+              help='Pretrained model file path to save (default: None).')
 @click.option('--objective', type=click.Choice(['one-class', 'soft-boundary']), default='one-class',
               help='Specify Deep SVDD objective ("one-class" or "soft-boundary").')
 @click.option('--nu', type=float, default=0.1, help='Deep SVDD hyperparameter nu (must be 0 < nu <= 1).')
@@ -55,9 +59,12 @@ from datasets.main import load_dataset
               help='Number of workers for data loading. 0 means that the data will be loaded in the main process.')
 @click.option('--normal_class', type=int, default=0,
               help='Specify the normal class of the dataset (all other classes are considered anomalous).')
-def main(dataset_name, net_name, xp_path, data_path, load_config, load_model, load_ae_model, objective, nu, device, seed,
+@click.option('--mode', type=click.Choice(['original', 'weight', 'input']), default='original',
+              help='Specify loss mode ("original", "weight", "input")')
+def main(dataset_name, net_name, xp_path, data_path, load_config, load_model, load_ae_model, save_ae_model, objective,
+         nu, device, seed,
          optimizer_name, lr, n_epochs, lr_milestone, batch_size, weight_decay, pretrain, ae_optimizer_name, ae_lr,
-         ae_n_epochs, ae_lr_milestone, ae_batch_size, ae_weight_decay, n_jobs_dataloader, normal_class):
+         ae_n_epochs, ae_lr_milestone, ae_batch_size, ae_weight_decay, n_jobs_dataloader, normal_class, mode):
     """
     Deep SVDD, a fully deep method for anomaly detection.
 
@@ -87,107 +94,143 @@ def main(dataset_name, net_name, xp_path, data_path, load_config, load_model, lo
     logger.info('Export path is %s.' % xp_path)
 
     logger.info('Dataset: %s' % dataset_name)
-    logger.info('Normal class: %d' % normal_class)
     logger.info('Network: %s' % net_name)
 
-    # If specified, load experiment config from JSON-file
-    if load_config:
-        cfg.load_config(import_json=load_config)
-        logger.info('Loaded configuration from %s.' % load_config)
+    try:
+        os.remove('test2.txt')
+    except OSError as error:
+        print(error)
 
-    # Print configuration
-    logger.info('Deep SVDD objective: %s' % cfg.settings['objective'])
-    logger.info('Nu-paramerter: %.2f' % cfg.settings['nu'])
+    repeat_n = 3
 
-    # Set seed
-    if cfg.settings['seed'] != -1:
-        random.seed(cfg.settings['seed'])
-        np.random.seed(cfg.settings['seed'])
-        torch.manual_seed(cfg.settings['seed'])
-        logger.info('Set seed to %d.' % cfg.settings['seed'])
+    for normal_class in range(10):
+        first = True
+        for mode in ['original', 'input']:
+            for add_params in [[],
+                               # ['update_c'],
+                               ['grad_norm']]:
+                if mode == 'original':
+                    if 'grad_norm' in add_params:
+                        continue
+                for i in range(repeat_n):
 
-    # Default device to 'cpu' if cuda is not available
-    if not torch.cuda.is_available():
-        device = 'cpu'
-    logger.info('Computation device: %s' % device)
-    logger.info('Number of dataloader workers: %d' % n_jobs_dataloader)
+                    if first:
+                        resume_path = None
+                        first = False
+                    else:
+                        resume_path = load_ae_model
+                    logger.info('Normal class: %d' % normal_class)
+                    logger.info('Loss mode: %s' % mode)
+                    with open("test2.txt", "a") as myfile:
+                        myfile.write('{} {} {} {}: '.format(normal_class, mode, add_params, i))
 
-    # Load data
-    dataset = load_dataset(dataset_name, data_path, normal_class)
+                    # If specified, load experiment config from JSON-file
+                    if load_config:
+                        cfg.load_config(import_json=load_config)
+                        logger.info('Loaded configuration from %s.' % load_config)
 
-    # Initialize DeepSVDD model and set neural network \phi
-    deep_SVDD = DeepSVDD(cfg.settings['objective'], cfg.settings['nu'])
-    deep_SVDD.set_network(net_name)
-    # If specified, load Deep SVDD model (radius R, center c, network weights, and possibly autoencoder weights)
-    if load_model:
-        deep_SVDD.load_model(model_path=load_model, load_ae=True)
-        logger.info('Loading model from %s.' % load_model)
+                    # Print configuration
+                    logger.info('Deep SVDD objective: %s' % cfg.settings['objective'])
+                    logger.info('Nu-paramerter: %.2f' % cfg.settings['nu'])
 
-    logger.info('Pretraining: %s' % pretrain)
-    if pretrain:
-        # Log pretraining details
-        logger.info('Pretraining optimizer: %s' % cfg.settings['ae_optimizer_name'])
-        logger.info('Pretraining learning rate: %g' % cfg.settings['ae_lr'])
-        logger.info('Pretraining epochs: %d' % cfg.settings['ae_n_epochs'])
-        logger.info('Pretraining learning rate scheduler milestones: %s' % (cfg.settings['ae_lr_milestone'],))
-        logger.info('Pretraining batch size: %d' % cfg.settings['ae_batch_size'])
-        logger.info('Pretraining weight decay: %g' % cfg.settings['ae_weight_decay'])
-        # Pretrain model on dataset (via autoencoder)
-        deep_SVDD.pretrain(dataset,
-                           optimizer_name=cfg.settings['ae_optimizer_name'],
-                           lr=cfg.settings['ae_lr'],
-                           n_epochs=cfg.settings['ae_n_epochs'],
-                           lr_milestones=cfg.settings['ae_lr_milestone'],
-                           batch_size=cfg.settings['ae_batch_size'],
-                           weight_decay=cfg.settings['ae_weight_decay'],
-                           device=device,
-                           n_jobs_dataloader=n_jobs_dataloader,
-                           resume_path=load_ae_model)
+                    # Set seed
+                    if cfg.settings['seed'] != -1:
+                        random.seed(cfg.settings['seed'])
+                        np.random.seed(cfg.settings['seed'])
+                        torch.manual_seed(cfg.settings['seed'])
+                        logger.info('Set seed to %d.' % cfg.settings['seed'])
 
-    # Log training details
-    logger.info('Training optimizer: %s' % cfg.settings['optimizer_name'])
-    logger.info('Training learning rate: %g' % cfg.settings['lr'])
-    logger.info('Training epochs: %d' % cfg.settings['n_epochs'])
-    logger.info('Training learning rate scheduler milestones: %s' % (cfg.settings['lr_milestone'],))
-    logger.info('Training batch size: %d' % cfg.settings['batch_size'])
-    logger.info('Training weight decay: %g' % cfg.settings['weight_decay'])
+                    # Default device to 'cpu' if cuda is not available
+                    if not torch.cuda.is_available():
+                        device = 'cpu'
+                    logger.info('Computation device: %s' % device)
+                    logger.info('Number of dataloader workers: %d' % n_jobs_dataloader)
 
-    # Train model on dataset
-    deep_SVDD.train(dataset,
-                    optimizer_name=cfg.settings['optimizer_name'],
-                    lr=cfg.settings['lr'],
-                    n_epochs=cfg.settings['n_epochs'],
-                    lr_milestones=cfg.settings['lr_milestone'],
-                    batch_size=cfg.settings['batch_size'],
-                    weight_decay=cfg.settings['weight_decay'],
-                    device=device,
-                    n_jobs_dataloader=n_jobs_dataloader)
+                    # Load data
+                    dataset = load_dataset(dataset_name, data_path, normal_class)
 
-    # Test model
-    deep_SVDD.test(dataset, device=device, n_jobs_dataloader=n_jobs_dataloader)
+                    # Initialize DeepSVDD model and set neural network \phi
+                    deep_SVDD = DeepSVDD(cfg.settings['objective'], cfg.settings['nu'])
+                    deep_SVDD.set_network(net_name)
+                    # If specified, load Deep SVDD model (radius R, center c, network weights, and possibly autoencoder weights)
+                    if load_model:
+                        deep_SVDD.load_model(model_path=load_model, load_ae=True)
+                        logger.info('Loading model from %s.' % load_model)
 
-    # Plot most anomalous and most normal (within-class) test samples
-    indices, labels, scores = zip(*deep_SVDD.results['test_scores'])
-    indices, labels, scores = np.array(indices), np.array(labels), np.array(scores)
-    idx_sorted = indices[labels == 0][np.argsort(scores[labels == 0])]  # sorted from lowest to highest anomaly score
+                    logger.info('Pretraining: %s' % pretrain)
+                    if pretrain:
+                        # Log pretraining details
+                        logger.info('Pretraining optimizer: %s' % cfg.settings['ae_optimizer_name'])
+                        logger.info('Pretraining learning rate: %g' % cfg.settings['ae_lr'])
+                        logger.info('Pretraining epochs: %d' % cfg.settings['ae_n_epochs'])
+                        logger.info(
+                            'Pretraining learning rate scheduler milestones: %s' % (cfg.settings['ae_lr_milestone'],))
+                        logger.info('Pretraining batch size: %d' % cfg.settings['ae_batch_size'])
+                        logger.info('Pretraining weight decay: %g' % cfg.settings['ae_weight_decay'])
+                        # Pretrain model on dataset (via autoencoder)
+                        deep_SVDD.pretrain(dataset,
+                                           optimizer_name=cfg.settings['ae_optimizer_name'],
+                                           lr=cfg.settings['ae_lr'],
+                                           n_epochs=cfg.settings['ae_n_epochs'],
+                                           lr_milestones=cfg.settings['ae_lr_milestone'],
+                                           batch_size=cfg.settings['ae_batch_size'],
+                                           weight_decay=cfg.settings['ae_weight_decay'],
+                                           device=device,
+                                           n_jobs_dataloader=n_jobs_dataloader,
+                                           resume_path=resume_path,
+                                           save_path=save_ae_model)
 
-    if dataset_name in ('mnist', 'cifar10'):
+                    # Log training details
+                    logger.info('Training optimizer: %s' % cfg.settings['optimizer_name'])
+                    logger.info('Training learning rate: %g' % cfg.settings['lr'])
+                    logger.info('Training epochs: %d' % cfg.settings['n_epochs'])
+                    logger.info('Training learning rate scheduler milestones: %s' % (cfg.settings['lr_milestone'],))
+                    logger.info('Training batch size: %d' % cfg.settings['batch_size'])
+                    logger.info('Training weight decay: %g' % cfg.settings['weight_decay'])
 
-        if dataset_name == 'mnist':
-            X_normals = dataset.test_set.data[idx_sorted[:32], ...].unsqueeze(1)
-            X_outliers = dataset.test_set.data[idx_sorted[-32:], ...].unsqueeze(1)
+                    # Train model on dataset
+                    deep_SVDD.train(dataset,
+                                    optimizer_name=cfg.settings['optimizer_name'],
+                                    lr=cfg.settings['lr'],
+                                    n_epochs=cfg.settings['n_epochs'],
+                                    lr_milestones=cfg.settings['lr_milestone'],
+                                    batch_size=cfg.settings['batch_size'],
+                                    weight_decay=cfg.settings['weight_decay'],
+                                    device=device,
+                                    n_jobs_dataloader=n_jobs_dataloader,
+                                    mode=mode,
+                                    add_params=add_params)
 
-        if dataset_name == 'cifar10':
-            X_normals = torch.tensor(np.transpose(dataset.test_set.data[idx_sorted[:32], ...], (0, 3, 1, 2)))
-            X_outliers = torch.tensor(np.transpose(dataset.test_set.data[idx_sorted[-32:], ...], (0, 3, 1, 2)))
+                    # Test model
+                    deep_SVDD.test(dataset, device=device, n_jobs_dataloader=n_jobs_dataloader)
 
-        plot_images_grid(X_normals, export_img=xp_path + '/normals', title='Most normal examples', padding=2)
-        plot_images_grid(X_outliers, export_img=xp_path + '/outliers', title='Most anomalous examples', padding=2)
+                    # Plot most anomalous and most normal (within-class) test samples
+                    indices, labels, scores = zip(*deep_SVDD.results['test_scores'])
+                    indices, labels, scores = np.array(indices), np.array(labels), np.array(scores)
+                    idx_sorted = indices[labels == 0][
+                        np.argsort(scores[labels == 0])]  # sorted from lowest to highest anomaly score
 
-    # Save results, model, and configuration
-    deep_SVDD.save_results(export_json=xp_path + '/results.json')
-    deep_SVDD.save_model(export_model=xp_path + '/model.tar')
-    cfg.save_config(export_json=xp_path + '/config.json')
+                    if dataset_name in ('mnist', 'cifar10'):
+
+                        if dataset_name == 'mnist':
+                            X_normals = dataset.test_set.data[idx_sorted[:32], ...].unsqueeze(1)
+                            X_outliers = dataset.test_set.data[idx_sorted[-32:], ...].unsqueeze(1)
+
+                        if dataset_name == 'cifar10':
+                            X_normals = torch.tensor(
+                                np.transpose(dataset.test_set.data[idx_sorted[:32], ...], (0, 3, 1, 2)))
+                            X_outliers = torch.tensor(
+                                np.transpose(dataset.test_set.data[idx_sorted[-32:], ...], (0, 3, 1, 2)))
+
+                        plot_images_grid(X_normals, export_img=xp_path + '/normals', title='Most normal examples',
+                                         padding=2)
+                        plot_images_grid(X_outliers, export_img=xp_path + '/outliers', title='Most anomalous examples',
+                                         padding=2)
+
+                    # Save results, model, and configuration
+                    deep_SVDD.save_results(export_json=xp_path + '/results.json')
+                    deep_SVDD.save_model(export_model=xp_path + '/model.tar')
+                    cfg.save_config(export_json=xp_path + '/config.json')
 
 
 if __name__ == '__main__':
