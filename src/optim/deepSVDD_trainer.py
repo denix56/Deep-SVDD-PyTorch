@@ -100,7 +100,7 @@ class DeepSVDDTrainer(BaseTrainer):
 
                 # Update network parameters via backpropagation: forward + backward + optimize
                 inputs.requires_grad_(True)
-                outputs = net(inputs)
+                outputs = net(inputs).squeeze()
                 loss3 = None
                 old_mode = self.mode
                 # grads2 = torch.autograd.grad(outputs=outputs.sum(), inputs=net.conv2.weight, create_graph=True, retain_graph=True)[0]
@@ -198,7 +198,7 @@ class DeepSVDDTrainer(BaseTrainer):
             for data in test_loader:
                 inputs, labels, idx = data
                 inputs = inputs.to(self.device)
-                outputs = net(inputs)
+                outputs = net(inputs).squeeze()
                 dist = torch.sum((outputs - self.c) ** 2, dim=1)
                 if self.objective == 'soft-boundary':
                     scores = dist - self.R ** 2
@@ -219,7 +219,6 @@ class DeepSVDDTrainer(BaseTrainer):
         _, labels, scores = zip(*idx_label_score)
         labels = np.array(labels)
         scores = np.array(scores)
-
         self.test_auc = roc_auc_score(labels, scores)
         logger.info('Test set AUC: {:.2f}%'.format(100. * self.test_auc))
         with open("test2.txt", "a") as myfile:
@@ -231,7 +230,6 @@ class DeepSVDDTrainer(BaseTrainer):
         """Initialize hypersphere center c as the mean from an initial forward pass on the data."""
         n_samples = 0
         c = torch.zeros(net.rep_dim, device=self.device)
-        print(c.shape)
 
         net.eval()
         with torch.no_grad():
@@ -241,7 +239,6 @@ class DeepSVDDTrainer(BaseTrainer):
                 inputs = inputs.to(self.device)
                 outputs = net(inputs)
                 n_samples += outputs.shape[0]
-                print(outputs.shape)
                 c += torch.sum(outputs, dim=0).squeeze()
 
         c /= n_samples
